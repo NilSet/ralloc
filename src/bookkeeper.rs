@@ -159,9 +159,8 @@ impl Bookkeeper {
         }).next() {
             let (res, excessive) = b.split(size);
 
-            // Mark the excessive space as free. Since `b` was split and we push `excessive`, not
-            // `res`, we have index `n + 1` NOT `n`.
-            self.free_ind(n + 1, excessive);
+            // Mark the excessive space as free.
+            self.free( excessive);
             //   ^^^^ Important note to self: Do not replace the old block, it is already replaced
             //        by the alignment block. Better let `free_ind` handle that.
 
@@ -227,8 +226,10 @@ impl Bookkeeper {
         // "Enter" the allocator.
         let block = self.enter(block);
 
-        let ind = self.find(&block);
+        let len = self.pool.len();
+        self.reserve(len+1);
 
+        let ind = self.find(&block);
         self.free_ind(ind, block);
     }
 
@@ -286,7 +287,7 @@ impl Bookkeeper {
                 block.copy_to(&mut res);
 
                 // Free the old block.
-                self.free_ind(ind, block);
+                self.free(block);
 
                 // Check consistency.
                 self.check();
@@ -361,7 +362,7 @@ impl Bookkeeper {
             // Split the block in two segments, the main segment and the excessive segment.
             let (block, excessive) = block.split(new_size);
             // Free the excessive segment.
-            self.free_ind(ind, excessive);
+            self.free( excessive);
 
             // Make some assertions to avoid dumb bugs.
             debug_assert!(block.size() == new_size, "Block wasn't shrinked properly.");
@@ -410,6 +411,10 @@ impl Bookkeeper {
         // Short circuit in case of empty block.
         if block.is_empty() { return; }
 
+        if ind == self.pool.len() {
+            self.push_no_reserve(block);
+            return;
+        }
         // Assertions...
         debug_assert!(self.find(&block) == ind, "Block is not inserted at the appropriate index.");
 
@@ -421,7 +426,8 @@ impl Bookkeeper {
             let entry = &mut after[0];
 
             // Try to merge it with the block to the right.
-            if entry.merge_right(&mut block).is_ok() {
+            if block.merge_right(entry).is_ok() {
+                *entry = block;
                 // The merging succeeded. We proceed to try to close in the possible gap.
                 if ind != 0 {
                     let _ = before[ind - 1].merge_right(entry);
@@ -645,8 +651,8 @@ impl Bookkeeper {
         assert!(self.pool.len() >= ind, "Insertion out of bounds.");
 
         // Some assertions...
-        debug_assert!(self.pool.is_empty() || block >= self.pool[ind + 1], "Inserting at {} will \
-                      make the list unsorted.", ind);
+        //debug_assert!(self.pool.is_empty() || block >= self.pool[ind + 1], "Inserting at {} will \
+        //              make the list unsorted.", ind);
         debug_assert!(self.find(&block) == ind, "Block is not inserted at the appropriate index.");
         debug_assert!(!block.is_empty(), "Inserting an empty block.");
 
