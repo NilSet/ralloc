@@ -63,6 +63,20 @@ impl Block {
         }
     }
 
+    pub fn empty_left(&self) -> Block {
+        Block {
+            size: 0,
+            ptr: unsafe { Pointer::new(*self.ptr) },
+        }
+    }
+
+    pub fn empty_right(&self) -> Block {
+        Block {
+            size: 0,
+            ptr: unsafe { Pointer::new(*self.ptr).offset(self.size as isize) },
+        }
+    }
+
     /// Merge this block with a block to the right.
     ///
     /// This will simply extend the block, adding the size of the block, and then set the size to
