@@ -233,7 +233,7 @@ impl Ord for Block {
 impl cmp::PartialEq for Block {
     #[inline]
     fn eq(&self, other: &Block) -> bool {
-        self.size == other.size && *self.ptr == *other.ptr
+        *self.ptr == *other.ptr
     }
 }
 

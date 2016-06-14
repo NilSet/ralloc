@@ -418,12 +418,21 @@ impl Bookkeeper {
         debug_assert!(self.find(&block) == ind, "Block is not inserted at the appropriate index.");
 
         {
+            let mut right_ind = match self.pool.binary_search(&block.empty_right()){
+                Ok(x) => {
+                    let y = self.pool.iter().rev().skip(self.pool.len()-x).take_while(|x| **x == block.empty_right()).count();
+                    x - y + self.pool.iter().skip(x-y).take_while(|x| x.is_empty()).count()
+                },
+                Err(_) => ind,
+            };
+            if right_ind == self.pool.len(){
+                right_ind = ind;
+            }
             // So, we want to work around some borrowck edginess...
             let (before, after) = self.pool.split_at_mut(ind);
             // To avoid double bound checking and other shenanigans, we declare a variable holding our
             // entry's pointer.
-            let entry = &mut after[0];
-
+            let entry = &mut after[right_ind - ind];
             // Try to merge it with the block to the right.
             if block.merge_right(entry).is_ok() {
                 *entry = block;
@@ -761,7 +770,7 @@ impl Bookkeeper {
                 assert!(i >= prev, "The block pool is not sorted at index, {} ({:?} < {:?})", n, i,
                         prev);
                 // Make sure no blocks are adjacent.
-                assert!(!prev.left_to(i) || i.is_empty(), "Adjacent blocks at index, {} ({:?} and \
+                assert!(!prev.left_to(i) || i.is_empty() || prev.is_empty(), "Adjacent blocks at index, {} ({:?} and \
                         {:?})", n, i, prev);
 
                 // Set the variable tracking the previous block.
